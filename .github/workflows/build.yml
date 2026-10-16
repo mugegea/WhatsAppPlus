@@ -1,0 +1,92 @@
+name: Build WhatsApp+ (Rootless DEB & Dylib)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies (ldid)
+        run: |
+          brew install ldid
+
+      - name: Setup Environment Variables
+        run: |
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "THEOS_DEVICE_IP=" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+
+      - name: Install Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+
+      - name: Download iOS Patched SDK
+        run: |
+          rm -rf $HOME/theos/sdks
+          git clone --depth=1 https://github.com/theos/sdks.git $HOME/theos/sdks
+
+      - name: Build Rootless DEB (for Dopamine)
+        run: |
+          export THEOS=$HOME/theos
+          make clean
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mkdir -p output
+          cp packages/*.deb output/
+
+      - name: Extract & Prepare Standalone Dylib (for Sideload / IPA Injection)
+        run: |
+          mkdir -p output/sideload_bundle
+          # Find the compiled dylib from .theos build tree
+          DYLIB_PATH=$(find .theos/obj -name "WhatsAppPlus.dylib" | head -n 1)
+          if [ -z "$DYLIB_PATH" ]; then
+            DYLIB_PATH=$(find .theos/_/var/jb/Library/MobileSubstrate/DynamicLibraries -name "WhatsAppPlus.dylib" | head -n 1)
+          fi
+          if [ -z "$DYLIB_PATH" ]; then
+            DYLIB_PATH=$(find .theos -name "WhatsAppPlus.dylib" | head -n 1)
+          fi
+          echo "Found dylib at: $DYLIB_PATH"
+          cp "$DYLIB_PATH" output/sideload_bundle/
+          cp WhatsAppPlus.plist output/sideload_bundle/
+          cd output
+          zip -r WhatsAppPlus_Sideload_Bundle.zip sideload_bundle/
+          cp sideload_bundle/WhatsAppPlus.dylib ./WhatsAppPlus.dylib
+
+      - name: List Generated Files
+        run: |
+          ls -la output/
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WhatsAppPlus-Build-Artifacts
+          path: |
+            output/*.deb
+            output/WhatsAppPlus.dylib
+            output/WhatsAppPlus_Sideload_Bundle.zip
+
+      - name: Create GitHub Release (On Tag Push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            output/*.deb
+            output/WhatsAppPlus.dylib
+            output/WhatsAppPlus_Sideload_Bundle.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -1,0 +1,7 @@
+.theos/
+packages/
+output/
+.DS_Store
+*.swp
+*.deb
+*.dylib

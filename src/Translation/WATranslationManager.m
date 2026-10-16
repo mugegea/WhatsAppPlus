@@ -13,6 +13,15 @@
 @property (nonatomic, strong) dispatch_queue_t syncQueue;
 @end
 
+static NSString *const kUsageTotalChars = @"WAUsage_TotalChars";
+static NSString *const kUsageTotalCalls = @"WAUsage_TotalCalls";
+static NSString *const kUsageTodayChars = @"WAUsage_TodayChars";
+static NSString *const kUsageTodayCalls = @"WAUsage_TodayCalls";
+static NSString *const kUsageTodayDate = @"WAUsage_TodayDate";
+static NSString *const kUsageGoogleFreeChars = @"WAUsage_GoogleFreeChars";
+static NSString *const kUsageGoogleCloudChars = @"WAUsage_GoogleCloudChars";
+static NSString *const kUsageMyMemoryChars = @"WAUsage_MyMemoryChars";
+
 @implementation WATranslationManager
 
 + (instancetype)sharedManager {
@@ -322,6 +331,7 @@ static NSString *WAPercentEncode(NSString *string) {
             NSString *finalTranslated = [self stringByDecodingHTMLEntities:rawTranslated];
             if (finalTranslated.length > 0) {
                 [self.translationCache setObject:finalTranslated forKey:cacheKey];
+                [self trackUsageWithChars:text.length engine:@"googleCloud"];
             }
             if (completion) completion(finalTranslated, detectedLang, nil);
         } else {
@@ -385,6 +395,7 @@ static NSString *WAPercentEncode(NSString *string) {
             NSString *finalTranslated = [self stringByDecodingHTMLEntities:[resultString copy]];
             if (finalTranslated.length > 0) {
                 [self.translationCache setObject:finalTranslated forKey:cacheKey];
+                [self trackUsageWithChars:text.length engine:@"googleFree"];
             }
             if (completion) completion(finalTranslated, detectedLang, nil);
         } else {
@@ -432,6 +443,7 @@ static NSString *WAPercentEncode(NSString *string) {
             if (translated && [translated isKindOfClass:[NSString class]] && translated.length > 0) {
                 NSString *finalTranslated = [self stringByDecodingHTMLEntities:translated];
                 [self.translationCache setObject:finalTranslated forKey:cacheKey];
+                [self trackUsageWithChars:text.length engine:@"myMemory"];
                 if (completion) completion(finalTranslated, srcCode, nil);
                 return;
             }
@@ -446,6 +458,57 @@ static NSString *WAPercentEncode(NSString *string) {
 
 - (void)clearCache {
     [self.translationCache removeAllObjects];
+}
+
+#pragma mark - Usage Statistics
+
+- (void)trackUsageWithChars:(NSUInteger)chars engine:(NSString *)engineName {
+    if (chars == 0) return;
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    // 跨天重置今日计数
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"yyyy-MM-dd";
+    NSString *todayStr = [fmt stringFromDate:[NSDate date]];
+    NSString *savedDate = [d stringForKey:kUsageTodayDate];
+    if (![savedDate isEqualToString:todayStr]) {
+        [d setInteger:0 forKey:kUsageTodayChars];
+        [d setInteger:0 forKey:kUsageTodayCalls];
+        [d setObject:todayStr forKey:kUsageTodayDate];
+    }
+    [d setInteger:[d integerForKey:kUsageTotalChars] + chars forKey:kUsageTotalChars];
+    [d setInteger:[d integerForKey:kUsageTotalCalls] + 1 forKey:kUsageTotalCalls];
+    [d setInteger:[d integerForKey:kUsageTodayChars] + chars forKey:kUsageTodayChars];
+    [d setInteger:[d integerForKey:kUsageTodayCalls] + 1 forKey:kUsageTodayCalls];
+    if ([engineName isEqualToString:@"googleFree"]) {
+        [d setInteger:[d integerForKey:kUsageGoogleFreeChars] + chars forKey:kUsageGoogleFreeChars];
+    } else if ([engineName isEqualToString:@"googleCloud"]) {
+        [d setInteger:[d integerForKey:kUsageGoogleCloudChars] + chars forKey:kUsageGoogleCloudChars];
+    } else if ([engineName isEqualToString:@"myMemory"]) {
+        [d setInteger:[d integerForKey:kUsageMyMemoryChars] + chars forKey:kUsageMyMemoryChars];
+    }
+    [d synchronize];
+}
+
+- (NSDictionary *)usageStatistics {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    return @{
+        @"todayChars": @([d integerForKey:kUsageTodayChars]),
+        @"todayCalls": @([d integerForKey:kUsageTodayCalls]),
+        @"totalChars": @([d integerForKey:kUsageTotalChars]),
+        @"totalCalls": @([d integerForKey:kUsageTotalCalls]),
+        @"googleFreeChars": @([d integerForKey:kUsageGoogleFreeChars]),
+        @"googleCloudChars": @([d integerForKey:kUsageGoogleCloudChars]),
+        @"myMemoryChars": @([d integerForKey:kUsageMyMemoryChars]),
+    };
+}
+
+- (void)resetUsageStatistics {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    for (NSString *k in @[kUsageTotalChars, kUsageTotalCalls, kUsageTodayChars, kUsageTodayCalls,
+                          kUsageGoogleFreeChars, kUsageGoogleCloudChars, kUsageMyMemoryChars]) {
+        [d removeObjectForKey:k];
+    }
+    [d synchronize];
 }
 
 @end

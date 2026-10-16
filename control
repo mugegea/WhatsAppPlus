@@ -1,6 +1,6 @@
 Package: com.bengege.whatsappplus
 Name: WhatsAppPlus
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64
 Description: WhatsApp 发送翻译增强：输入中文自动翻译为英语，双语/纯英语发送，三引擎翻译（Google Cloud/免费/MyMemory），图标自定义。
 Maintainer: bengege <https://t.me/bengege>

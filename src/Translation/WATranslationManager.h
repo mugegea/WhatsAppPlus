@@ -74,6 +74,17 @@ typedef void (^WATranslationDetailedCompletion)(NSString * _Nullable translatedT
  */
 - (void)clearCache;
 
+/**
+ * 用量统计：返回 @{@"todayChars": N, @"todayCalls": N, @"totalChars": N, @"totalCalls": N,
+ *   @"googleFreeChars": N, @"googleCloudChars": N, @"myMemoryChars": N}
+ */
+- (NSDictionary *)usageStatistics;
+
+/**
+ * 重置用量统计（全部清零）。
+ */
+- (void)resetUsageStatistics;
+
 @end
 
 NS_ASSUME_NONNULL_END

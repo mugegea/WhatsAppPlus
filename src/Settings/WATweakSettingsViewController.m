@@ -32,14 +32,15 @@
 #pragma mark - Table View Data Source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3;
+    return 4;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
         case 0: return 6; // 发送翻译
-        case 1: return 2; // 图标与外观
-        case 2: return 2; // 关于
+        case 1: return 6; // 翻译用量
+        case 2: return 2; // 图标与外观
+        case 3: return 2; // 关于
         default: return 0;
     }
 }
@@ -47,8 +48,9 @@
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     switch (section) {
         case 0: return @"🌐 发送翻译";
-        case 1: return @"🎨 图标与外观";
-        case 2: return @"ℹ️ 关于插件";
+        case 1: return @"📊 翻译用量";
+        case 2: return @"🎨 图标与外观";
+        case 3: return @"ℹ️ 关于插件";
         default: return nil;
     }
 }
@@ -56,8 +58,9 @@
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     switch (section) {
         case 0: return @"输入中文停顿 1.5 秒自动翻译为双语显示在输入框，点发送即发出。三引擎链路：Google Cloud 官方 API（需自配 Key）→ Google 免费接口 → MyMemory 兜底。";
-        case 1: return @"自由更换应用桌面图标，并可解锁 Meta 实验室毛玻璃 UI。";
-        case 2: return nil;
+        case 1: return @"本地统计，仅记录本插件的翻译调用量。";
+        case 2: return @"自由更换应用桌面图标，并可解锁 Meta 实验室毛玻璃 UI。";
+        case 3: return nil;
         default: return nil;
     }
 }
@@ -124,6 +127,29 @@
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         }
     } else if (indexPath.section == 1) {
+        // 翻译用量
+        NSDictionary *stats = [[WATranslationManager sharedManager] usageStatistics];
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"今日用量";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ 字符 / %@ 次", stats[@"todayChars"], stats[@"todayCalls"]];
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = @"累计用量";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ 字符 / %@ 次", stats[@"totalChars"], stats[@"totalCalls"]];
+        } else if (indexPath.row == 2) {
+            cell.textLabel.text = @"Google 免费接口";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ 字符", stats[@"googleFreeChars"]];
+        } else if (indexPath.row == 3) {
+            cell.textLabel.text = @"Google Cloud";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ 字符", stats[@"googleCloudChars"]];
+        } else if (indexPath.row == 4) {
+            cell.textLabel.text = @"MyMemory";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ 字符", stats[@"myMemoryChars"]];
+        } else if (indexPath.row == 5) {
+            cell.textLabel.text = @"重置统计";
+            cell.textLabel.textColor = [UIColor systemRedColor];
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        }
+    } else if (indexPath.section == 2) {
         // 图标与外观
         if (indexPath.row == 0) {
             cell.textLabel.text = @"更换应用桌面图标";
@@ -137,7 +163,7 @@
             [sw addTarget:self action:@selector(liquidGlassToggled:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = sw;
         }
-    } else if (indexPath.section == 2) {
+    } else if (indexPath.section == 3) {
         // 关于
         if (indexPath.row == 0) {
             cell.textLabel.text = @"当前版本";
@@ -171,13 +197,21 @@
             [self presentViewController:alert animated:YES completion:nil];
         }
     } else if (indexPath.section == 1) {
+        if (indexPath.row == 5) {
+            [[WATranslationManager sharedManager] resetUsageStatistics];
+            [self.tableView reloadData];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"用量统计已重置" preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        }
+    } else if (indexPath.section == 2) {
         if (indexPath.row == 0) {
             WAIconPickerViewController *iconVC = [[WAIconPickerViewController alloc] init];
             UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:iconVC];
             nav.modalPresentationStyle = UIModalPresentationFormSheet;
             [self presentViewController:nav animated:YES completion:nil];
         }
-    } else if (indexPath.section == 2) {
+    } else if (indexPath.section == 3) {
         if (indexPath.row == 1) {
             NSURL *url = [NSURL URLWithString:@"https://t.me/bengege"];
             if ([[UIApplication sharedApplication] canOpenURL:url]) {
